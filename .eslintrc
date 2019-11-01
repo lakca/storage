@@ -1,0 +1,3 @@
+{
+  "extends": "@lakca/eslint-config-lakca"
+}

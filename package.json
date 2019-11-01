@@ -1,0 +1,24 @@
+{
+  "name": "@lakca/storage",
+  "version": "1.0.0",
+  "description": "modelized storage (localStorage/sessionStorage/cookie).",
+  "main": "index.js",
+  "git": "git@github.com:lakca/storage.git",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "MIT"
+  },
+  "keywords": [
+    "web",
+    "storage",
+    "modelized"
+  ],
+  "author": "lakca",
+  "license": "MIT",
+  "devDependencies": {
+    "@lakca/eslint-config-lakca": "git+https://github.com/lakca/eslintrc.git#v1.0.0"
+  }
+}
