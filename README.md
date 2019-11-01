@@ -18,8 +18,8 @@ storage.define('profile', {
   }
 })
 
-// localStorage
-const result = storage('local', {
+// localStorage, sessionStorage, cookie
+const result = storage('local'/* local, session, cookie */, {
   namespace/* namespace, prevent from conflict */: 'test',
   saveDefault/* save default value to store or not */: false })
   .model('profile') /* choose model */
@@ -36,3 +36,10 @@ const result = storage('local', {
   .property('name') /* return name property of previous instance */
   .end() /* execute, and return last execution result. mary instance will return here. */
 ```
+### API
+    - storage.define()
+    - storage.model()
+    - storage.instance()
+    - storage.property()
+    - storage.create()
+    - storage.end()
