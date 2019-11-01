@@ -75,7 +75,7 @@ class Model {
       if (model[property].default === void 0) {
         this.$required.push(property)
       } else {
-        this.$default[property] = model[property]
+        this.$default[property] = model[property].default
       }
     }
   }
@@ -139,8 +139,10 @@ class Model {
 }
 
 class Stage {
-  constructor(namespace, structs) {
-    this.$namespace = namespace
+  constructor(structs, options = {}) {
+    this.$storage = null
+    this.$namespace = options.namespace
+    this.$isSaveDefault = options.saveDefault
     this.$define = Object.create(null)
     this.$upsert = Object.create(null) // update or create
     this.$create = Object.create(null) // only create
@@ -194,6 +196,7 @@ class Stage {
   }
   create(name, obj) {
     this.$flag = 'create'
+    this.$instance = name
     this.$create[this.$model][name] = copy(obj)
     return this
   }
@@ -206,55 +209,10 @@ class Stage {
     return this
   }
   end() {
-    console.log(this)
-    // drop
-    for (const model of Object.keys(this.$drop)) {
-      for (const instance of this.$drop[model]) {
-        this.$del(model, instance)
-      }
-    }
-    // create
-    for (const model of Object.keys(this.$create)) {
-      for (const instance of Object.keys(this.$create[model])) {
-        const data = this.$create[model][instance]
-        this.$throwOnValidateFailed(model, data)
-        if (this.$exist(model, instance)) {
-          throwError('INSTANCE_ALREADY_EXIST', { model, instance })
-        }
-        this.$set(model, instance, data)
-      }
-    }
-    // upsert
-    for (const model of Object.keys(this.$upsert)) {
-      for (const instance of Object.keys(this.$upsert[model])) {
-        const data = this.$upsert[model][instance]
-        const srcData = this.$get(model, instance)
-        if (srcData) {
-          for (const property of Object.keys(data)) {
-            this.$throwOnValidateFailed(model, property, data[property])
-          }
-        } else {
-          this.$throwOnValidateFailed(model, data)
-        }
-        this.$set(model, instance, Object.assign({}, srcData, data))
-      }
-    }
-    // update
-    for (const model of Object.keys(this.$update)) {
-      for (const instance of Object.keys(this.$update[model])) {
-        const data = this.$update[model][instance]
-        const properties = Object.keys(data)
-        for (const property of properties) {
-          this.$throwOnValidateFailed(model, property, data[property])
-        }
-        if (properties.length && !this.$exist(model, instance)) {
-          throwError('INSTANCE_NOT_EXIST', { model, instance })
-        }
-        for (const property of properties) {
-          this.$set(model, instance, property, data[property])
-        }
-      }
-    }
+    this._drop()
+    this._create()
+    this._upsert()
+    this._update()
     switch (this.$flag) {
       case 'instance':
         return this.$get(this.$model, this.$instance)
@@ -263,61 +221,111 @@ class Stage {
       default:
     }
   }
-
-  $throwOnValidateFailed(modelName, property, value) {
+  _throwOnValidateFailed(modelName, property, value) {
     const model = this.$define[modelName]
     if (!model) {
       return throwError('UNDEFINED_MODEL', { model: modelName })
     }
     if (typeof property === 'object') {
-      model.validate(property)
+      model.validate(property, value)
     } else {
       model.validateField(property, value)
     }
   }
-
-  $exist(model, instance) {
-    return !!this.$get(model, instance)
-  }
-  /* eslint-disable */
-  $get(model, instance, property) {}
-  $set(model, instance, property, value) {}
-  $del(model, instance) { }
-  /* eslint-enable */
-}
-
-class StageLocalStorage extends Stage {
-  constructor(...props) {
-    super(...props)
-    this.storage = window.localStorage
-  }
-  $exist(modelName, instanceName) {
-    return !!this.$get(modelName, instanceName)
-  }
-  $set(modelName, instanceName, property, value) {
-    const key = this.$key(modelName, instanceName)
-    console.log(...arguments, key)
-    if (typeof property === 'object') {
-      this.storage.setItem(key, JSON.stringify(property))
-    } else {
-      const srcData = this.$get(modelName, instanceName)
-      const data = Object.assign(srcData, { [property]: value })
-      this.storage.setItem(key, JSON.stringify(data))
+  _drop() {
+    for (const model of Object.keys(this.$drop)) {
+      for (const instance of this.$drop[model]) {
+        this.$storage.removeItem(this.$key(model, instance))
+      }
     }
   }
-  $del(modelName, instanceName) {
-    this.storage.removeItem(this.$key(modelName, instanceName))
+  _create() {
+    for (const model of Object.keys(this.$create)) {
+      for (const instance of Object.keys(this.$create[model])) {
+        const data = this.$create[model][instance]
+        this._throwOnValidateFailed(model, data, {
+          validateNotProvided: true,
+          assignDefault: this.$isSaveDefault,
+          prune: true
+        })
+        const source = this.$get(model, instance, {
+          validateNotProvided: true,
+          assignDefault: false,
+          prune: false
+        })
+        if (source) {
+          throwError('INSTANCE_ALREADY_EXIST', { model, instance })
+        }
+        this.$set(model, instance, data)
+      }
+    }
   }
-  $get(modelName, instanceName, property) {
-    const model = this.$define[modelName]
-    const key = this.$key(modelName, instanceName)
+  _update() {
+    for (const model of Object.keys(this.$update)) {
+      for (const instance of Object.keys(this.$update[model])) {
+        const data = this.$update[model][instance]
+        const properties = Object.keys(data)
+        if (!properties.length) continue
+        for (const property of properties) {
+          this._throwOnValidateFailed(model, property, data[property])
+        }
+        const source = this.$get(model, instance, {
+          validateNotProvided: true,
+          assignDefault: false,
+          prune: false
+        })
+        console.log(source)
+        if (!source) {
+          throwError('INSTANCE_NOT_EXIST', { model, instance })
+        }
+        this.$set(model, instance, Object.assign(source, data))
+      }
+    }
+  }
+  _upsert() {
+    for (const model of Object.keys(this.$upsert)) {
+      for (const instance of Object.keys(this.$upsert[model])) {
+        const data = this.$upsert[model][instance]
+        const source = this.$get(model, instance, {
+          validateNotProvided: true,
+          assignDefault: this.$isSaveDefault,
+          prune: false
+        })
+        if (source) {
+          for (const property of Object.keys(data)) {
+            this._throwOnValidateFailed(model, property, data[property])
+          }
+        } else {
+          this._throwOnValidateFailed(model, data, {
+            validateNotProvided: true,
+            assignDefault: this.$isSaveDefault,
+            prune: true
+          })
+        }
+        this.$set(model, instance, Object.assign({}, source, data))
+      }
+    }
+  }
+  $set(model, instance, data) {
+    this.$storage.setItem(this.$key(model, instance), JSON.stringify(data))
+  }
+  $get(model, instance, property, options) {
+    if (typeof property === 'object') {
+      options = property
+      property = void 0
+    }
+    const key = this.$key(model, instance)
     let ret
     try {
-      const data = JSON.parse(this.storage.getItem(key))
-      model.validate(data, { validateNotProvided: true })
+      const data = JSON.parse(this.$storage.getItem(key))
+      this._throwOnValidateFailed(model, data, Object.assign({
+        validateNotProvided: true,
+        assignDefault: true,
+        prune: true
+      }, options))
       ret = data
     } catch (e) {
-      this.storage.removeItem(key)
+      this.$storage.removeItem(key)
       return
     }
     if (property) {
@@ -328,10 +336,17 @@ class StageLocalStorage extends Stage {
   }
 }
 
-class StageSessionStorage extends StageLocalStorage {
+class StageLocalStorage extends Stage {
   constructor(...props) {
     super(...props)
-    this.storage = window.sessionStorage
+    this.$storage = window.localStorage
+  }
+}
+
+class StageSessionStorage extends Stage {
+  constructor(...props) {
+    super(...props)
+    this.$storage = window.sessionStorage
   }
 }
 
@@ -355,10 +370,10 @@ const cookieStorage = {
   }
 }
 
-class StageCookie extends StageLocalStorage {
+class StageCookie extends Stage {
   constructor(...props) {
     super(...props)
-    this.storage = advancedAssign({ $namespace: this.$namespace }, cookieStorage)
+    this.$storage = advancedAssign({ $namespace: this.$namespace }, cookieStorage)
   }
 }
 
@@ -369,14 +384,14 @@ function startStorage() {
   function define(name, struct) {
     structs[name] = struct
   }
-  function storage(name, namespace) {
+  function storage(name, options) {
     switch (name) {
       case 'cookie':
-        return new StageCookie(namespace, structs)
+        return new StageCookie(structs, options)
       case 'session':
-        return new StageSessionStorage(namespace, structs)
+        return new StageSessionStorage(structs, options)
       case 'local':
-        return new StageLocalStorage(namespace, structs)
+        return new StageLocalStorage(structs, options)
       default:
         throwError('UNKNOWN_STORAGE', { storage: name })
     }
