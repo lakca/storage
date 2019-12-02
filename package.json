@@ -19,6 +19,7 @@
   "author": "lakca",
   "license": "MIT",
   "devDependencies": {
-    "@lakca/eslint-config-lakca": "git+https://github.com/lakca/eslintrc.git#v1.0.0"
+    "@lakca/eslint-config-lakca": "git+https://github.com/lakca/eslintrc.git#v1.0.0",
+    "eslint": "^6.7.2"
   }
 }

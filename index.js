@@ -70,12 +70,17 @@ class Model {
     this.$model = model
     this.$default = {}
     this.$required = []
-    this.$property = Object.keys(model)
+    this.$property = Object.keys(this.$model)
     for (const property of this.$property) {
-      if (model[property].default === void 0) {
+      if (typeof this.$model[property] === 'string') {
+        this.$model[property] = {
+          type: this.$model[property]
+        }
+      }
+      if (this.$model[property].default === void 0) {
         this.$required.push(property)
       } else {
-        this.$default[property] = model[property].default
+        this.$default[property] = this.$model[property].default
       }
     }
   }
@@ -190,6 +195,8 @@ class Stage {
       this.$property = name
       if (arguments.length > 1) {
         this.$update[this.$model][this.$instance][name] = copy(value)
+      } else {
+        return this.end()
       }
     }
     return this
@@ -389,8 +396,10 @@ function startStorage() {
       case 'cookie':
         return new StageCookie(structs, options)
       case 'session':
+      case 'sessionStorage':
         return new StageSessionStorage(structs, options)
       case 'local':
+      case 'localStorage':
         return new StageLocalStorage(structs, options)
       default:
         throwError('UNKNOWN_STORAGE', { storage: name })

@@ -5,9 +5,10 @@ modelized storage (localStorage/sessionStorage/cookie).
 const { storage } = require('@lakca/storage')
 
 storage.define('profile', {
-  name: {
+  name: 'string', // name is required. Any field with no default property will be required.
+  /* name: {
     type: 'string'
-  },
+  } */
   gender: {
     type: 'boolean',
     default: true
@@ -33,8 +34,11 @@ const result = storage('local'/* local, session, cookie */, {
     name: 'jack'
   }) /* create jack instance, throw error when jack already exists. */
   .instance('mary') /* choose instance mary */
-  .property('name') /* return name property of previous instance */
-  .end() /* execute, and return last execution result. mary instance will return here. */
+
+  /* execution */
+  .end() // return last execution result. mary instance will return here.
+  // or
+  .property('name') /* .property(<string>) will call .end() internally, return name property of previous instance. */
 ```
 ### API
     - storage.define()
