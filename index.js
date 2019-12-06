@@ -14,6 +14,19 @@ function copy(val) {
   }
 }
 
+function isObject(t) {
+  return toString.call(t) === '[object Object]'
+}
+function isString(t) {
+  return typeof t === 'string'
+}
+function isArray(t) {
+  return Array.isArray(t)
+}
+function isPrimitive(t) {
+  return typeof t !== 'object'
+}
+
 function advancedAssign(target, ...sources) {
   sources.forEach(source => {
     const descriptors = {}
@@ -49,7 +62,7 @@ function throwError(code, more) {
       error.message = `${more.field} is required in model ${more.model}.`
       break
     case 'ERROR_FIELD_TYPE':
-      error.message = `Value of ${more.field} in model ${more.model} should be ${more.been}, but got a ${more.expected}`
+      error.message = `Value of ${more.field} in model ${more.model} should be ${more.expected}, but got a ${more.been}`
       break
     case 'INSTANCE_ALREADY_EXIST':
       error.message = `${more.instance} already exists in model ${more.model}.`
@@ -71,18 +84,19 @@ class Model {
     this.$default = {}
     this.$required = []
     this.$property = Object.keys(this.$model)
-    for (const property of this.$property) {
-      if (typeof this.$model[property] === 'string') {
-        this.$model[property] = {
-          type: this.$model[property]
-        }
-      }
-      if (this.$model[property].default === void 0) {
-        this.$required.push(property)
-      } else {
-        this.$default[property] = this.$model[property].default
-      }
-    }
+    // for (const property of this.$property) {
+    //   if (isString(this.$model[property])) {
+    //     this.$model[property] = [
+    //       this.$model[property]
+    //     ]
+    //   }
+    //   const dft = this.$model[property][1]
+    //   if (dft === void 0) {
+    //     this.$required.push(property)
+    //   } else {
+    //     this.$default[property] = dft
+    //   }
+    // }
   }
   validateField(property, value) {
     if (!this.$model[property]) {
@@ -92,17 +106,20 @@ class Model {
     if (this.$required.includes(property) && value === void 0) {
       throwError('MISSING_REQUIRED_FIELD', { model: this.$name, field: property })
     }
-    switch (description.type) {
-      case 'boolean':
-      case 'string':
-      case 'number':
-        if (typeof value !== description.type) {
-          throwError('ERROR_FIELD_TYPE', { model: this.$name, field: property, been: description.type, expected: typeof value })
-        } break
-      case 'json':
-      case 'reference':
-      default:
-    }
+    // const been = Object.getPrototypeOf(value).constructor.name.toLowerCase()
+    // const expected = description.type
+    // switch (description.type) {
+    //   case 'boolean':
+    //   case 'string':
+    //   case 'number':
+    //   case 'array':
+    //     if (been !== expected) {
+    //       throwError('ERROR_FIELD_TYPE', { model: this.$name, field: property, expected, been })
+    //     } break
+    //   case 'object': // TODO:
+    //   case 'reference': // TODO:
+    //   default:
+    // }
   }
   validate(instance, opts = {}) {
     const options = Object.assign({
@@ -189,7 +206,7 @@ class Stage {
   }
   property(name, value) {
     this.$flag = 'property'
-    if (typeof name === 'object') {
+    if (isObject(name)) {
       Object.assign(this.$update[this.$model][this.$instance], copy(name))
     } else {
       this.$property = name

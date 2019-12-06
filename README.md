@@ -47,3 +47,9 @@ const result = storage('local'/* local, session, cookie */, {
     - storage.property()
     - storage.create()
     - storage.end()
+
+
+# TODO
+1. 支持深度属性（子孙属性）
+2. 支持单一元素model
+3. definitelyTyped
